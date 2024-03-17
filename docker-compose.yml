@@ -1,0 +1,60 @@
+version: '3.7'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_SUPPORT_METRICS_ENABLE: 'false'
+      KAFKA_LISTENERS: PLAINTEXT://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=ERROR,kafka.producer.async.DefaultEventHandler=ERROR,state.change.logger=ERROR"
+
+  clickhouse:
+    build:
+      context: ./clickhouse
+    ports:
+      - "8124:8123"
+      - "9001:9000"
+      
+  producer:
+    build:
+      context: ./producer
+    depends_on:
+      - kafka
+
+  consumer:
+    build:
+      context: ./consumer
+    depends_on:
+      - kafka
+      - clickhouse
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"  
+    environment:
+      GF_SECURITY_ADMIN_USER: admin  # Optional: Specify admin username
+      GF_SECURITY_ADMIN_PASSWORD: admin  # Optional: Specify admin password
+    volumes:
+      - grafana_data:/var/lib/grafana  # Persisting Grafana data
+    depends_on:
+      - clickhouse  # Assuming Grafana will be using data from ClickHouse
+
+volumes:
+  grafana_data:  # Grafana data volume
